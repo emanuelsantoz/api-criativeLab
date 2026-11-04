@@ -5,6 +5,7 @@ import { deleteMedia, resolveStorageProvider, uploadMedia, type UploadableMedia 
 import { AccessTokenService } from '../services/access-token.service';
 import { NoOpenSemesterError, SemesterService } from '../services/semester.service';
 import type { VerifiedDirectUpload } from '../storage/direct-upload.service';
+import { projectSlugBase } from '../utils/project-slug';
 
 const details = {
   course: true,
@@ -109,6 +110,7 @@ export class SubmissionOrchestrator {
       const project = await prisma.project.create({
         data: {
           id: projectId,
+          slug: `${projectSlugBase(input.title)}-${projectId.slice(0, 8)}`,
           title: input.title,
           shortDescription: input.shortDescription,
           description: input.description,
@@ -157,8 +159,11 @@ export class SubmissionOrchestrator {
     if (!semester) throw new NoOpenSemesterError();
     await this.semesters.assertCourseAcceptsProjects(semester.id, input.courseId, input.className, input.tags);
 
+    const projectId = crypto.randomUUID();
     const project = await prisma.project.create({
       data: {
+        id: projectId,
+        slug: `${projectSlugBase(input.title)}-${projectId.slice(0, 8)}`,
         title: input.title,
         shortDescription: input.shortDescription,
         description: input.description,

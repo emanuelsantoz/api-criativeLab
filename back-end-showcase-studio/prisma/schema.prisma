@@ -47,6 +47,25 @@ enum SemesterStatus {
   ARCHIVED
 }
 
+enum InstitutionRole {
+  INSTITUTION_ADMIN
+  COORDINATOR
+  PROFESSOR
+}
+
+enum SubmissionContextStatus {
+  DRAFT
+  OPEN
+  CLOSED
+  ARCHIVED
+}
+
+enum SubmissionScope {
+  INSTITUTION
+  COURSE
+  DISCIPLINE
+}
+
 model User {
   id              String          @id @default(uuid())
   name            String
@@ -64,6 +83,7 @@ model User {
   notifySearchTrends Boolean      @default(false)
   courseId        String?
   course          Course?         @relation(fields: [courseId], references: [id])
+  institutionMemberships InstitutionMembership[]
   projects        ProjectMember[]
   likes           Like[]
   createdProjects Project[]       @relation("ProjectCreator")
@@ -76,17 +96,153 @@ model User {
 
 model Course {
   id              String           @id @default(uuid())
-  name            String           @unique
+  institutionId   String
+  name            String
   description     String?
+  institution     Institution      @relation(fields: [institutionId], references: [id], onDelete: Restrict)
   users           User[]
   projects        Project[]
   semesterCourses SemesterCourse[]
+
+  submissionContexts SubmissionContext[]
+  courseDisciplines CourseDiscipline[]
+
+  @@unique([institutionId, name])
+  @@index([institutionId])
+}
+
+model InstitutionType {
+  id           String        @id @default(uuid())
+  name         String        @unique
+  slug         String        @unique
+  institutions Institution[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model Institution {
+  id                String                  @id @default(uuid())
+  name              String
+  slug              String                  @unique
+  institutionTypeId String
+  logoUrl           String?
+  websiteUrl        String?
+  active            Boolean                 @default(true)
+  institutionType   InstitutionType         @relation(fields: [institutionTypeId], references: [id], onDelete: Restrict)
+  memberships       InstitutionMembership[]
+  courses           Course[]
+  disciplines       Discipline[]
+  academicPeriods   AcademicPeriod[]
+  submissionContexts SubmissionContext[]
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+
+  @@index([institutionTypeId])
+  @@index([active])
+}
+
+model InstitutionMembership {
+  institutionId String
+  userId        String
+  role          InstitutionRole
+  active        Boolean     @default(true)
+  institution   Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@id([institutionId, userId])
+  @@index([userId, active])
+}
+
+model AcademicPeriod {
+  id            String        @id @default(uuid())
+  institutionId String
+  code          String
+  label         String
+  startsAt      DateTime?
+  endsAt        DateTime?
+  institution   Institution   @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  submissionContexts SubmissionContext[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@unique([institutionId, code])
+  @@index([institutionId])
+}
+
+model Discipline {
+  id            String        @id @default(uuid())
+  institutionId String
+  name          String
+  code          String?
+  description   String?
+  institution   Institution   @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  courseDisciplines CourseDiscipline[]
+  submissionContexts SubmissionContext[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@unique([institutionId, name])
+  @@unique([institutionId, code])
+  @@index([institutionId])
+}
+
+model CourseDiscipline {
+  courseId          String
+  disciplineId      String
+  recommendedPeriod Int?
+  required          Boolean    @default(false)
+  course            Course     @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  discipline        Discipline @relation(fields: [disciplineId], references: [id], onDelete: Cascade)
+
+  @@id([courseId, disciplineId])
+  @@index([disciplineId])
+}
+
+model SubmissionContext {
+  id                 String                  @id @default(uuid())
+  institutionId      String
+  academicPeriodId   String?
+  courseId           String?
+  disciplineId       String?
+  scope              SubmissionScope
+  status             SubmissionContextStatus @default(DRAFT)
+  name               String
+  className          String?
+  theme              String?
+  submissionsOpenAt  DateTime?
+  submissionsCloseAt DateTime?
+  institution        Institution             @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  academicPeriod     AcademicPeriod?         @relation(fields: [academicPeriodId], references: [id], onDelete: SetNull)
+  course             Course?                 @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  discipline         Discipline?             @relation(fields: [disciplineId], references: [id], onDelete: SetNull)
+  tags               SubmissionContextTag[]
+  projects           Project[]
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+
+  @@index([institutionId, status])
+  @@index([academicPeriodId])
+  @@index([courseId])
+  @@index([disciplineId])
+}
+
+model SubmissionContextTag {
+  submissionContextId String
+  tagId               String
+  submissionContext   SubmissionContext @relation(fields: [submissionContextId], references: [id], onDelete: Cascade)
+  tag                 Tag               @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([submissionContextId, tagId])
+  @@index([tagId])
 }
 
 model Tag {
   id              String             @id @default(uuid())
   name            String             @unique
   semesterCourses SemesterCourseTag[]
+  submissionContexts SubmissionContextTag[]
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
 }
@@ -118,6 +274,8 @@ model Project {
   course                   Course               @relation(fields: [courseId], references: [id])
   semesterId               String
   semester                 Semester             @relation(fields: [semesterId], references: [id])
+  submissionContextId      String?
+  submissionContext        SubmissionContext?   @relation(fields: [submissionContextId], references: [id], onDelete: SetNull)
   createdById              String?
   createdBy                User?                @relation("ProjectCreator", fields: [createdById], references: [id], onDelete: SetNull)
   members                  ProjectMember[]
@@ -135,6 +293,7 @@ model Project {
   @@index([courseId])
   @@index([semesterId, className, status])
   @@index([createdById])
+  @@index([submissionContextId])
 }
 
 model Semester {

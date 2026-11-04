@@ -7,13 +7,14 @@ import { z } from 'zod';
 export const courseRoutes = new Hono();
 
 const createCourseSchema = z.object({
+  institutionId: z.string().uuid(),
   name: z.string().trim().min(2).max(120),
   description: z.string().trim().max(500).optional().or(z.literal('')),
 });
 
 courseRoutes.post('/', requireAuth, requireModerator, async (c) => {
   const body = createCourseSchema.parse(await c.req.json());
-  const course = await prisma.course.create({ data: { name: body.name, description: body.description || null } });
+  const course = await prisma.course.create({ data: { institutionId: body.institutionId, name: body.name, description: body.description || null } });
   return c.json({ data: course, message: 'Curso cadastrado.' }, 201);
 });
 

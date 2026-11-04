@@ -11,6 +11,7 @@ import { moderationRoutes } from './modules/router/moderation.routes';
 import { semesterRoutes } from './modules/router/semester.routes';
 import { userRoutes } from './modules/router/users.routes';
 import { dashboardRoutes } from './modules/router/dashboard.routes';
+import { institutionRoutes } from './modules/router/institutions.routes';
 import { env } from './config/env';
 import { NoOpenSemesterError, SemesterCourseConfigurationError, SemesterDeletionError } from './modules/services/semester.service';
 import { MediaStorageError } from './modules/storage/media.storage';
@@ -83,5 +84,6 @@ app.route('/moderation', moderationRoutes);
 app.route('/semesters', semesterRoutes);
 app.route('/users', userRoutes);
 app.route('/dashboard', dashboardRoutes);
+app.route('/institutions', institutionRoutes);
 
 export default app;
