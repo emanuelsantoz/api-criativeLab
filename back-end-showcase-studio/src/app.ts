@@ -24,9 +24,17 @@ const app = new Hono().basePath('/api/v1');
 app.get('/healthz', (c) => c.json({ status: 'ok' }));
 app.use('*', logger());
 
+const configuredOrigins = env.CORS_ORIGIN
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 const allowedOrigins = env.NODE_ENV === 'production'
-  ? ['https://criativelab.tech', 'https://www.criativelab.tech']
-  : ['*'];
+  ? Array.from(new Set([
+    'https://criativelab.tech',
+    'https://www.criativelab.tech',
+    ...configuredOrigins,
+  ]))
+  : configuredOrigins.length > 0 ? configuredOrigins : ['*'];
 const allowsAnyOrigin = allowedOrigins.includes('*');
 
 app.use('*', cors({
