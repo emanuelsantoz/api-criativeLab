@@ -25,7 +25,7 @@ dashboardRoutes.get('/analytics', requireAuth, requireModerator, async (c) => {
   const today = startUtcDay(new Date());
   const currentStart = addUtcDays(today, -29);
   const previousStart = addUtcDays(currentStart, -30);
-  const [projects, currentVisits, previousVisits, projectViews, semesters] = await Promise.all([
+  const [projects, currentVisits, previousVisits, projectViews, semesters, feedbackResponses] = await Promise.all([
     prisma.project.findMany({
     where: { status: 'APPROVED' },
     select: {
@@ -41,6 +41,18 @@ dashboardRoutes.get('/analytics', requireAuth, requireModerator, async (c) => {
     prisma.siteVisit.count({ where: { day: { gte: previousStart, lt: currentStart } } }),
     prisma.anonymousView.findMany({ where: { createdAt: { gte: currentStart } }, select: { createdAt: true } }),
     prisma.semester.count(),
+    prisma.submissionFeedback.findMany({
+      select: {
+        requiredInformationEase: true,
+        overallExperience: true,
+        hardestStep: true,
+        understoodNextSteps: true,
+        reuseIntent: true,
+        improvementSuggestion: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
   ]);
   const topics = new Map<string, number>();
   for (const project of projects) for (const tag of project.tags) topics.set(tag, (topics.get(tag) ?? 0) + 1);
@@ -62,6 +74,8 @@ dashboardRoutes.get('/analytics', requireAuth, requireModerator, async (c) => {
   });
   const uniqueVisits = currentVisits.length;
   const changePercentage = previousVisits === 0 ? null : Math.round(((uniqueVisits - previousVisits) / previousVisits) * 100);
+  const positiveExperiences = feedbackResponses.filter((feedback) => ['PERFECT', 'GOOD'].includes(feedback.overallExperience)).length;
+  const understoodNextSteps = feedbackResponses.filter((feedback) => feedback.understoodNextSteps === 'YES_COMPLETELY').length;
   return c.json({ data: {
     publishedProjects: projects.length,
     totalViews: projects.reduce((total, project) => total + project.viewsCount, 0),
@@ -71,6 +85,17 @@ dashboardRoutes.get('/analytics', requireAuth, requireModerator, async (c) => {
     traffic,
     trafficSummary: { uniqueVisits, projectViews: projectViews.length, previousUniqueVisits: previousVisits, changePercentage },
     topics: [...topics.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([topic, searches]) => ({ topic, searches })),
+    submissionFeedback: {
+      totalResponses: feedbackResponses.length,
+      positiveExperiencePercentage: percentage(positiveExperiences, feedbackResponses.length),
+      understoodNextStepsPercentage: percentage(understoodNextSteps, feedbackResponses.length),
+      difficultyBreakdown: countByValue(feedbackResponses.map((feedback) => feedback.hardestStep)),
+      reuseIntentBreakdown: countByValue(feedbackResponses.map((feedback) => feedback.reuseIntent)),
+      suggestions: feedbackResponses
+        .filter((feedback) => feedback.improvementSuggestion)
+        .slice(0, 5)
+        .map((feedback) => ({ text: feedback.improvementSuggestion!, createdAt: feedback.createdAt })),
+    },
   } });
 });
 
@@ -93,4 +118,14 @@ function countByDate(dates: Date[]) {
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
   return counts;
+}
+
+function countByValue(values: string[]) {
+  const counts: Record<string, number> = {};
+  for (const value of values) counts[value] = (counts[value] ?? 0) + 1;
+  return counts;
+}
+
+function percentage(part: number, total: number) {
+  return total === 0 ? 0 : Math.round((part / total) * 100);
 }

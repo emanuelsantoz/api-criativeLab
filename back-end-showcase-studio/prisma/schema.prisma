@@ -66,6 +66,44 @@ enum SubmissionScope {
   DISCIPLINE
 }
 
+enum SubmissionFeedbackEase {
+  VERY_EASY
+  EASY
+  DIFFICULT
+  VERY_DIFFICULT
+}
+
+enum SubmissionFeedbackExperience {
+  PERFECT
+  GOOD
+  BAD
+  VERY_BAD
+}
+
+enum SubmissionFeedbackHardestStep {
+  COURSE_CLASS
+  PROJECT_INFORMATION
+  TEAM_MEMBERS
+  MEDIA_UPLOAD
+  PROJECT_LINKS
+  NO_DIFFICULTY
+  OTHER
+}
+
+enum SubmissionFeedbackUnderstanding {
+  YES_COMPLETELY
+  YES_PARTIALLY
+  NO
+}
+
+enum SubmissionFeedbackReuseIntent {
+  DEFINITELY
+  PROBABLY
+  MAYBE
+  PROBABLY_NOT
+  WOULD_NOT_USE
+}
+
 model User {
   id              String          @id @default(uuid())
   name            String
@@ -286,6 +324,7 @@ model Project {
   presentation             ProjectPresentation?
   reviews                  ProjectReview[]
   accessTokens             ProjectAccessToken[]
+  submissionFeedback       SubmissionFeedback?
   createdAt                DateTime             @default(now())
   updatedAt                DateTime             @updatedAt
 
@@ -363,6 +402,22 @@ model ProjectAccessToken {
   project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId, expiresAt])
+}
+
+model SubmissionFeedback {
+  id                     String                           @id @default(uuid())
+  projectId              String                           @unique
+  requiredInformationEase SubmissionFeedbackEase
+  overallExperience      SubmissionFeedbackExperience
+  hardestStep            SubmissionFeedbackHardestStep
+  hardestStepOther       String?                          @db.VarChar(160)
+  understoodNextSteps    SubmissionFeedbackUnderstanding
+  reuseIntent            SubmissionFeedbackReuseIntent
+  improvementSuggestion  String?                          @db.Text
+  createdAt              DateTime                         @default(now())
+  project                Project                          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
 }
 
 model ProjectPresentation {
