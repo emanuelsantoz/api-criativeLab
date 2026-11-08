@@ -25,7 +25,7 @@ dashboardRoutes.get('/analytics', requireAuth, requireModerator, async (c) => {
   const today = startUtcDay(new Date());
   const currentStart = addUtcDays(today, -29);
   const previousStart = addUtcDays(currentStart, -30);
-  const [projects, currentVisits, previousVisits, projectViews, semesters, feedbackResponses] = await Promise.all([
+  const [projects, currentVisits, previousVisits, projectViews, semesters, feedbackResponses, platformFeedbackResponses] = await Promise.all([
     prisma.project.findMany({
     where: { status: 'APPROVED' },
     select: {
@@ -53,6 +53,10 @@ dashboardRoutes.get('/analytics', requireAuth, requireModerator, async (c) => {
       },
       orderBy: { createdAt: 'desc' },
     }),
+    prisma.platformFeedback.findMany({
+      select: { rating: true, type: true, topic: true, message: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+    }),
   ]);
   const topics = new Map<string, number>();
   for (const project of projects) for (const tag of project.tags) topics.set(tag, (topics.get(tag) ?? 0) + 1);
@@ -76,6 +80,10 @@ dashboardRoutes.get('/analytics', requireAuth, requireModerator, async (c) => {
   const changePercentage = previousVisits === 0 ? null : Math.round(((uniqueVisits - previousVisits) / previousVisits) * 100);
   const positiveExperiences = feedbackResponses.filter((feedback) => ['PERFECT', 'GOOD'].includes(feedback.overallExperience)).length;
   const understoodNextSteps = feedbackResponses.filter((feedback) => feedback.understoodNextSteps === 'YES_COMPLETELY').length;
+  const ratedPlatformFeedback = platformFeedbackResponses.filter((feedback) => feedback.rating !== null);
+  const averagePlatformRating = ratedPlatformFeedback.length === 0
+    ? null
+    : Math.round((ratedPlatformFeedback.reduce((total, feedback) => total + (feedback.rating ?? 0), 0) / ratedPlatformFeedback.length) * 10) / 10;
   return c.json({ data: {
     publishedProjects: projects.length,
     totalViews: projects.reduce((total, project) => total + project.viewsCount, 0),
@@ -95,6 +103,19 @@ dashboardRoutes.get('/analytics', requireAuth, requireModerator, async (c) => {
         .filter((feedback) => feedback.improvementSuggestion)
         .slice(0, 5)
         .map((feedback) => ({ text: feedback.improvementSuggestion!, createdAt: feedback.createdAt })),
+    },
+    platformFeedback: {
+      totalResponses: platformFeedbackResponses.length,
+      averageRating: averagePlatformRating,
+      typeBreakdown: countByValue(platformFeedbackResponses.map((feedback) => feedback.type)),
+      topicBreakdown: countByValue(platformFeedbackResponses.map((feedback) => feedback.topic)),
+      recent: platformFeedbackResponses.slice(0, 5).map((feedback) => ({
+        type: feedback.type,
+        topic: feedback.topic,
+        text: feedback.message,
+        rating: feedback.rating,
+        createdAt: feedback.createdAt,
+      })),
     },
   } });
 });
