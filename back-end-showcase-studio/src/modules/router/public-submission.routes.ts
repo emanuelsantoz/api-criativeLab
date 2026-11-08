@@ -11,6 +11,7 @@ router.post('/', enforceRateLimit({ scope: 'public-submission', limit: 3, window
 // Os binários nunca passam pela Function.
 router.post('/uploads/authorize', enforceRateLimit({ scope: 'public-upload-authorize', limit: 12, windowMs: 60 * 60_000 }), controller.authorizeUploads);
 router.post('/access', enforceRateLimit({ scope: 'submission-access', limit: 12, windowMs: 15 * 60_000 }), controller.access);
+router.post('/:id/feedback', enforceRateLimit({ scope: 'submission-feedback', limit: 5, windowMs: 24 * 60 * 60_000 }), requireSubmissionAccess, controller.feedback);
 router.get('/:id', enforceRateLimit({ scope: 'submission-read', limit: 30, windowMs: 15 * 60_000 }), requireSubmissionAccess, controller.get);
 router.post('/:id/resubmit', enforceRateLimit({ scope: 'submission-resubmit', limit: 8, windowMs: 60 * 60_000 }), requireSubmissionAccess, controller.resubmit);
 

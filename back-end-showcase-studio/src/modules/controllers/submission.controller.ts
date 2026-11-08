@@ -4,10 +4,12 @@ import { z } from 'zod';
 import { SubmissionOrchestrator, type DirectPublicSubmissionInput, type PublicSubmissionInput } from '../orchestrators/submission.orchestrator';
 import { AccessTokenService } from '../services/access-token.service';
 import { publicResubmissionSchema, publicSubmissionSchema } from '../schemas/submission.schema';
+import { submissionFeedbackSchema } from '../schemas/submission-feedback.schema';
 import type { UploadableMedia } from '../storage/media.storage';
 import { assertImageSignature, assertPdfSignature } from '../storage/media-validation';
 import { DirectUploadService, type DirectUploadKind, type DirectUploadReference } from '../storage/direct-upload.service';
 import { AuditService } from '../services/audit.service';
+import { prisma } from '../../db/prisma';
 
 const orchestrator = new SubmissionOrchestrator();
 const accessTokens = new AccessTokenService();
@@ -73,6 +75,27 @@ export class SubmissionController {
     const access = c.get('submissionAccess') as { projectId: string; token: string };
     const project = await orchestrator.resubmit(access.projectId, await parseResubmissionBody(await c.req.parseBody() as Record<string, unknown>), access.token);
     return c.json({ data: project, message: 'Projeto reenviado para validação.' }, 200);
+  }
+
+  async feedback(c: Context) {
+    const input = submissionFeedbackSchema.parse(await c.req.json());
+    const access = c.get('submissionAccess') as { projectId: string };
+    const feedback = await prisma.submissionFeedback.create({
+      data: {
+        projectId: access.projectId,
+        ...input,
+        hardestStepOther: input.hardestStepOther || null,
+        improvementSuggestion: input.improvementSuggestion || null,
+      },
+      select: { id: true, createdAt: true },
+    });
+    await audit.record({
+      action: 'submission-feedback-created',
+      resource: 'project',
+      resourceId: access.projectId,
+      metadata: { overallExperience: input.overallExperience, reuseIntent: input.reuseIntent },
+    }).catch((error) => console.error('[Audit] submission feedback record failed', { error: error instanceof Error ? error.message : String(error) }));
+    return c.json({ data: feedback }, 201);
   }
 }
 

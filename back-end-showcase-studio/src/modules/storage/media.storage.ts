@@ -58,6 +58,12 @@ export function getR2StorageConfig(): R2StorageConfig {
       region: 'auto',
       endpoint: `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
       credentials: { accessKeyId: env.R2_ACCESS_KEY_ID, secretAccessKey: env.R2_SECRET_ACCESS_KEY },
+      // O SDK AWS recente calcula CRC32 automaticamente. Em um upload
+      // pré-assinado, porém, ele não conhece o arquivo que será enviado pelo
+      // navegador e acabava assinando o CRC de um corpo vazio. O R2 rejeita o
+      // PUT real como assinatura incompatível. Só calculamos checksum quando
+      // a operação o exigir explicitamente.
+      requestChecksumCalculation: 'WHEN_REQUIRED',
     }),
   };
 }

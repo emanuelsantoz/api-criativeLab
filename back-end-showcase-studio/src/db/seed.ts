@@ -123,7 +123,7 @@ async function main() {
         liveUrl: 'https://example.com',
       },
     });
-  });
+  }, { maxWait: 10_000, timeout: 60_000 });
 
   console.log('Banco resetado com sucesso.');
   console.log(`Administrador criado: ${adminEmail}`);
