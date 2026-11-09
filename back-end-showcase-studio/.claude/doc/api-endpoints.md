@@ -68,6 +68,29 @@ All endpoints are prefixed with `/api/v1`.
   - `401 Unauthorized`: Invalid or missing token
   - `403 Forbidden`: User does not have permission
 
+### 6. Update Project Content & Team Photos (Curation)
+- **Route**: `PATCH /api/v1/projects/:id/content`
+- **Auth**: Required (JWT - ADMIN, COORDENADOR, or project creator)
+- **Request Body (JSON)**:
+  - `title`, `shortDescription`, `description`, `submitterName`, `submitterEmail`, `courseId`, `semesterId`, `className`, `tags`, `liveUrl`, `prototypeUrl`, `repositoryUrl`
+  - `submitterAvatarUrl`: `string | null` (optional)
+  - `submitterAvatarColor`: `string` (optional, hex `#RRGGBB`)
+  - `submitterAvatarUpload`: `{ key: string, token: string }` (optional, direct R2 upload reference)
+  - `thumbnailUpload`: `{ key: string, token: string }` (optional, direct R2 upload reference)
+  - `contributors`: `array` of `{ name, email?, roleInfo?, avatarUrl?, avatarColor?, avatarUpload? }` (optional)
+
+### 7. Authorize Direct Project Media Uploads
+- **Route**: `POST /api/v1/projects/:id/uploads/authorize`
+- **Auth**: Required (JWT - ADMIN, COORDENADOR, or project creator)
+- **Request Body (JSON)**:
+  - `files`: `array` of `{ id, kind: "THUMBNAIL" | "SUBMITTER_AVATAR" | "CONTRIBUTOR_AVATAR" | "PRESENTATION_PDF", contentType, size }`
+
+### 8. Upload Project Avatar (Fallback / Direct Multipart)
+- **Route**: `POST /api/v1/projects/:id/avatar`
+- **Auth**: Required (JWT - ADMIN, COORDENADOR, or project creator)
+- **Request Body (`multipart/form-data`)**:
+  - `file`: JPEG, PNG, or WebP image (<= 2 MB)
+
 ## 📊 Response Formats
 
 ### Success Response
