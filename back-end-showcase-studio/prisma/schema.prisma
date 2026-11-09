@@ -104,6 +104,19 @@ enum SubmissionFeedbackReuseIntent {
   WOULD_NOT_USE
 }
 
+enum PlatformFeedbackType {
+  SUGGESTION
+  PROBLEM
+  PRAISE
+}
+
+enum PlatformFeedbackTopic {
+  SUBMISSION_FORM
+  SUPPORT_CHANNEL
+  SEARCH_SYSTEM
+  PROJECT_EVALUATION
+}
+
 model User {
   id              String          @id @default(uuid())
   name            String
@@ -418,6 +431,23 @@ model SubmissionFeedback {
   project                Project                          @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([createdAt])
+}
+
+// Avaliação opcional da plataforma. Armazenamos apenas o hash do identificador
+// aleatório do navegador para limitar um envio por dia, sem criar cadastro.
+model PlatformFeedback {
+  id          String                @id @default(uuid())
+  visitorHash String
+  day         DateTime              @db.Date
+  rating      Int?
+  type        PlatformFeedbackType
+  topic       PlatformFeedbackTopic
+  message     String                @db.Text
+  createdAt   DateTime              @default(now())
+
+  @@unique([visitorHash, day])
+  @@index([createdAt])
+  @@index([topic])
 }
 
 model ProjectPresentation {
