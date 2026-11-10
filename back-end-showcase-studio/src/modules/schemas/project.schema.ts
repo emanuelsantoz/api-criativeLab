@@ -47,12 +47,31 @@ export const engagementSchema = z.object({
   visitorId: z.string().uuid(),
 }).strict();
 
+export const directUploadReferenceSchema = z.object({
+  key: z.string().trim().min(1).max(512),
+  token: z.string().trim().min(1).max(2048),
+});
+
+export const updateProjectContributorSchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  email: z.string().trim().email().max(180).optional().or(z.literal('')),
+  roleInfo: z.string().trim().max(80).optional().or(z.literal('')),
+  avatarUrl: externalUrl.nullable().optional().or(z.literal('')),
+  avatarColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  avatarUpload: directUploadReferenceSchema.optional(),
+});
+
 export const updateProjectContentSchema = z.object({
   title: z.string().trim().min(1).max(100),
   shortDescription: z.string().min(10).max(255),
   description: z.string().min(20),
   submitterName: z.string().trim().min(2).max(120).optional(),
   submitterEmail: z.string().trim().email().max(180).optional().or(z.literal('')),
+  submitterAvatarUrl: externalUrl.nullable().optional().or(z.literal('')),
+  submitterAvatarColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  submitterAvatarUpload: directUploadReferenceSchema.optional(),
+  thumbnailUpload: directUploadReferenceSchema.optional(),
+  contributors: z.array(updateProjectContributorSchema).max(20).optional(),
   courseId: z.string().uuid().optional(),
   semesterId: z.string().min(1).optional(),
   className: z.string().trim().min(1).max(120).optional(),

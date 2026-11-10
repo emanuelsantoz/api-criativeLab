@@ -25,7 +25,9 @@ router.post('/:id/like', enforceRateLimit({ scope: 'project-like', limit: 30, wi
 router.patch('/:id/status', requireAuth, requireModerator, zValidator('json', updateProjectStatusSchema), controller.moderate);
 router.delete('/:id', requireAuth, requireModerator, controller.remove);
 router.patch('/:id/content', requireAuth, zValidator('json', updateProjectContentSchema), controller.updateContent);
-router.post('/:id/thumbnail', requireAuth, enforceRateLimit({ scope: 'project-thumbnail', limit: 12, windowMs: 60 * 60_000 }), enforceContentLength(3 * 1024 * 1024), controller.uploadThumbnail);
+router.post('/:id/uploads/authorize', requireAuth, enforceRateLimit({ scope: 'project-upload-authorize', limit: 40, windowMs: 60 * 60_000 }), controller.authorizeUploads);
+router.post('/:id/thumbnail', requireAuth, enforceRateLimit({ scope: 'project-thumbnail', limit: 30, windowMs: 60 * 60_000 }), enforceContentLength(3 * 1024 * 1024), controller.uploadThumbnail);
+router.post('/:id/avatar', requireAuth, enforceRateLimit({ scope: 'project-avatar', limit: 60, windowMs: 60 * 60_000 }), enforceContentLength(3 * 1024 * 1024), controller.uploadAvatar);
 router.post('/:id/presentation/canva', requireAuth, zValidator('json', canvaPresentationSchema), controller.setCanvaPresentation);
 router.post('/:id/presentation/pdf', requireAuth, enforceRateLimit({ scope: 'project-pdf', limit: 8, windowMs: 60 * 60_000 }), enforceContentLength(11 * 1024 * 1024), controller.uploadPdf);
 router.delete('/:id/presentation', requireAuth, controller.deletePresentation);

@@ -246,8 +246,44 @@ export class ProjectService {
     return { id };
   }
 
-  async updateContent(id: string, data: { title: string; shortDescription: string; description: string; submitterName?: string; submitterEmail?: string; courseId?: string; semesterId?: string; className?: string; tags: string[]; liveUrl?: string; prototypeUrl?: string; repositoryUrl?: string }) {
-    const current = await prisma.project.findUnique({ where: { id }, select: { courseId: true, semesterId: true, className: true } });
+  async updateContent(
+    id: string,
+    data: {
+      title: string;
+      shortDescription: string;
+      description: string;
+      submitterName?: string;
+      submitterEmail?: string;
+      submitterAvatarUrl?: string | null;
+      submitterAvatarColor?: string;
+      thumbnail?: { url: string; key: string; provider: StorageProvider };
+      contributors?: Array<{
+        name: string;
+        email?: string;
+        roleInfo?: string;
+        avatarUrl?: string | null;
+        avatarColor?: string;
+      }>;
+      courseId?: string;
+      semesterId?: string;
+      className?: string;
+      tags: string[];
+      liveUrl?: string;
+      prototypeUrl?: string;
+      repositoryUrl?: string;
+    },
+  ) {
+    const current = await prisma.project.findUnique({
+      where: { id },
+      select: {
+        courseId: true,
+        semesterId: true,
+        className: true,
+        thumbnailStorageProvider: true,
+        thumbnailStorageKey: true,
+        thumbnailUrl: true,
+      },
+    });
     if (!current) return null;
 
     const nextCourseId = data.courseId ?? current.courseId;
@@ -266,24 +302,82 @@ export class ProjectService {
       if (!offering) throw new SemesterCourseConfigurationError('A disciplina não está vinculada a essa turma e semestre.');
     }
 
-    return prisma.project.update({
-      where: { id },
-      data: {
-        title: data.title.trim(),
-        shortDescription: data.shortDescription.trim(),
-        description: data.description.trim(),
-        submitterName: data.submitterName?.trim(),
-        submitterEmail: data.submitterEmail?.trim() || null,
-        ...(data.courseId !== undefined ? { courseId: nextCourseId } : {}),
-        ...(data.semesterId !== undefined ? { semesterId: nextSemesterId } : {}),
-        ...(data.className !== undefined ? { className: nextClassName } : {}),
-        tags: [...new Set(data.tags.map((tag) => tag.trim()).filter(Boolean))],
-        liveUrl: data.liveUrl?.trim() || null,
-        prototypeUrl: data.prototypeUrl?.trim() || null,
-        repositoryUrl: data.repositoryUrl?.trim() || null,
-      },
-      include: details,
+    const updated = await prisma.$transaction(async (tx) => {
+      if (data.contributors !== undefined) {
+        await tx.projectContributor.deleteMany({ where: { projectId: id } });
+        if (data.contributors.length > 0) {
+          await tx.projectContributor.createMany({
+            data: data.contributors.map(({ name, email, roleInfo, avatarUrl, avatarColor }) => ({
+              projectId: id,
+              name: name.trim(),
+              email: email?.trim() || null,
+              roleInfo: roleInfo?.trim() || null,
+              avatarUrl: avatarUrl?.trim() || null,
+              avatarColor: avatarColor || null,
+            })),
+          });
+        }
+      }
+
+      return tx.project.update({
+        where: { id },
+        data: {
+          title: data.title.trim(),
+          shortDescription: data.shortDescription.trim(),
+          description: data.description.trim(),
+          submitterName: data.submitterName?.trim(),
+          submitterEmail: data.submitterEmail?.trim() || null,
+          ...(data.submitterAvatarUrl !== undefined
+            ? { submitterAvatarUrl: data.submitterAvatarUrl?.trim() || null }
+            : {}),
+          ...(data.submitterAvatarColor !== undefined
+            ? { submitterAvatarColor: data.submitterAvatarColor }
+            : {}),
+          ...(data.thumbnail
+            ? {
+                thumbnailUrl: data.thumbnail.url,
+                thumbnailStorageProvider: data.thumbnail.provider,
+                thumbnailStorageKey: data.thumbnail.key,
+              }
+            : {}),
+          ...(data.courseId !== undefined ? { courseId: nextCourseId } : {}),
+          ...(data.semesterId !== undefined ? { semesterId: nextSemesterId } : {}),
+          ...(data.className !== undefined ? { className: nextClassName } : {}),
+          tags: [...new Set(data.tags.map((tag) => tag.trim()).filter(Boolean))],
+          liveUrl: data.liveUrl?.trim() || null,
+          prototypeUrl: data.prototypeUrl?.trim() || null,
+          repositoryUrl: data.repositoryUrl?.trim() || null,
+        },
+        include: details,
+      });
     });
+
+    if (
+      data.thumbnail &&
+      current.thumbnailStorageProvider &&
+      current.thumbnailStorageKey &&
+      (current.thumbnailStorageProvider !== data.thumbnail.provider ||
+        current.thumbnailStorageKey !== data.thumbnail.key)
+    ) {
+      await deleteMedia(
+        current.thumbnailStorageProvider,
+        current.thumbnailStorageKey || current.thumbnailUrl,
+      ).catch((error) => {
+        console.error('[ProjectService] previous thumbnail cleanup failed', {
+          id,
+          errorName: error instanceof Error ? error.name : 'UnknownError',
+          errorMessage: error instanceof Error ? error.message : String(error),
+        });
+      });
+    }
+
+    return updated;
+  }
+
+  async uploadAvatar(id: string, file: UploadableMedia) {
+    const provider = resolveStorageProvider('CONTRIBUTOR_AVATAR');
+    const extension = file.type === 'image/jpeg' ? 'jpg' : file.type === 'image/png' ? 'png' : 'webp';
+    return uploadMedia(`projects/${id}/avatars/${randomUUID()}.${extension}`, file, provider);
   }
 
   async canManageProject(id: string, userId: string, role: string) {
