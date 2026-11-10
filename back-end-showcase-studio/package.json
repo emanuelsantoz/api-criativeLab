@@ -12,7 +12,8 @@
     "prisma:generate": "prisma generate",
     "r2:configure-cors": "tsx scripts/configure-r2-cors.ts",
     "db:seed": "prisma generate && tsx src/db/seed.ts",
-    "db:seed:tags": "prisma generate && tsx src/db/seed-tags.ts"
+    "db:seed:tags": "prisma generate && tsx src/db/seed-tags.ts",
+    "db:backfill-institutions": "prisma generate && tsx scripts/backfill-institutions.ts"
   },
   "prisma": {
     "seed": "tsx src/db/seed.ts"
