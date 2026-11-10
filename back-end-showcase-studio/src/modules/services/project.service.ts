@@ -1,5 +1,5 @@
 import { prisma } from '../../db/prisma';
-import { ProjectStatus, StorageProvider } from '@prisma/client';
+import { Prisma, ProjectStatus, StorageProvider } from '@prisma/client';
 import { createHash, randomUUID } from 'node:crypto';
 import { deleteMedia, resolveStorageProvider, uploadMedia, type UploadableMedia } from '../storage/media.storage';
 import { NoOpenSemesterError, SemesterCourseConfigurationError, SemesterService } from './semester.service';
@@ -42,7 +42,13 @@ const publicProjectSelect = {
   submitterAvatarColor: true,
   createdAt: true,
   updatedAt: true,
-  course: { select: { id: true, name: true } },
+  course: {
+    select: {
+      id: true,
+      name: true,
+      institution: { select: { id: true, name: true, slug: true, logoUrl: true } },
+    },
+  },
   semester: { select: { id: true, year: true, number: true, code: true, label: true, startsAt: true, endsAt: true } },
   presentation: { select: { id: true, projectId: true, type: true, url: true } },
   members: { select: { roleInfo: true, user: { select: { id: true, name: true } } } },
@@ -84,10 +90,13 @@ export class ProjectService {
     return `${base}-${sequence}`;
   }
 
-  async listProjects(filters: { courseId?: string; semesterId?: string; isFeatured?: boolean; page: number; limit: number }) {
+  async listProjects(filters: { courseId?: string; institutionSlug?: string; semesterId?: string; isFeatured?: boolean; page: number; limit: number }) {
     const skip = (filters.page - 1) * filters.limit;
-    const where: { status: ProjectStatus; courseId?: string; semesterId?: string; isFeatured?: boolean } = { status: ProjectStatus.APPROVED };
+    const where: Prisma.ProjectWhereInput = { status: ProjectStatus.APPROVED };
     if (filters.courseId) where.courseId = filters.courseId;
+    if (filters.institutionSlug) {
+      where.course = { institution: { slug: filters.institutionSlug, active: true } };
+    }
     if (filters.semesterId) where.semesterId = filters.semesterId;
     if (filters.isFeatured !== undefined) where.isFeatured = filters.isFeatured;
 

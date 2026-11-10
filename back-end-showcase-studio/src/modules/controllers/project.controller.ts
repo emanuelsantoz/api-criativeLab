@@ -29,6 +29,7 @@ export class ProjectController {
     const query = c.req.query();
     const result = await projectService.listProjects({
       courseId: query.courseId,
+      institutionSlug: query.institutionSlug,
       semesterId: query.semesterId,
       isFeatured: query.isFeatured === undefined ? undefined : query.isFeatured === 'true',
       page: Number(query.page ?? '1'),
