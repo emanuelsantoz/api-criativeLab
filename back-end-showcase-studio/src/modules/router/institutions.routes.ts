@@ -3,8 +3,25 @@ import { InstitutionMediaType, InstitutionRole, ProjectStatus } from '@prisma/cl
 import { z } from 'zod';
 import { prisma } from '../../db/prisma';
 import { requireAdmin, requireAuth } from '../auth';
+import type { MiddlewareHandler } from 'hono';
+import { randomUUID } from 'node:crypto';
+import { uploadMedia, resolveStorageProvider, type UploadableMedia } from '../storage/media.storage';
+import { assertImageSignature } from '../storage/media-validation';
+import { enforceContentLength, enforceRateLimit } from '../security/rate-limit';
 
 export const institutionRoutes = new Hono();
+
+const requireInstitutionAdmin: MiddlewareHandler = async (c, next) => {
+  const user = c.get('user') as { id: string; role: string };
+  if (user.role !== 'ADMIN') {
+    const membership = await prisma.institutionMembership.findFirst({
+      where: { userId: user.id, institutionId: c.req.param('id'), role: InstitutionRole.INSTITUTION_ADMIN, active: true, institution: { active: true } },
+      select: { userId: true },
+    });
+    if (!membership) return c.json({ error: 'Forbidden', message: 'Sem permissão para esta instituição.' }, 403);
+  }
+  await next();
+};
 
 const slug = z.string().trim().toLowerCase().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Use letras minúsculas, números e hífens.').min(2).max(100);
 const optionalUrl = z.string().trim().url().max(2048).optional().or(z.literal(''));
@@ -109,8 +126,10 @@ institutionRoutes.post('/', requireAuth, requireAdmin, async (c) => {
   return c.json({ data: institution, message: 'Instituição cadastrada.' }, 201);
 });
 
-institutionRoutes.patch('/:id', requireAuth, requireAdmin, async (c) => {
+institutionRoutes.patch('/:id', requireAuth, requireInstitutionAdmin, async (c) => {
   const body = updateInstitutionSchema.parse(await c.req.json());
+  const user = (c as any).get('user') as { role: string };
+  if (user.role !== 'ADMIN' && (body.active !== undefined || body.slug !== undefined)) return c.json({ error: 'Forbidden', message: 'Somente administradores podem alterar slug ou status.' }, 403);
   const institution = await prisma.institution.update({
     where: { id: c.req.param('id') },
     data: {
@@ -124,7 +143,7 @@ institutionRoutes.patch('/:id', requireAuth, requireAdmin, async (c) => {
   return c.json({ data: institution, message: 'Instituição atualizada.' });
 });
 
-institutionRoutes.post('/:id/media', requireAuth, requireAdmin, async (c) => {
+institutionRoutes.post('/:id/media', requireAuth, requireInstitutionAdmin, async (c) => {
   const body = mediaSchema.parse(await c.req.json());
   const media = await prisma.institutionMedia.create({
     data: {
@@ -139,7 +158,7 @@ institutionRoutes.post('/:id/media', requireAuth, requireAdmin, async (c) => {
   return c.json({ data: media, message: 'Mídia institucional adicionada.' }, 201);
 });
 
-institutionRoutes.patch('/:id/media/:mediaId', requireAuth, requireAdmin, async (c) => {
+institutionRoutes.patch('/:id/media/:mediaId', requireAuth, requireInstitutionAdmin, async (c) => {
   const body = mediaSchema.partial().parse(await c.req.json());
   const media = await prisma.institutionMedia.updateMany({
     where: { id: c.req.param('mediaId'), institutionId: c.req.param('id') },
@@ -153,10 +172,23 @@ institutionRoutes.patch('/:id/media/:mediaId', requireAuth, requireAdmin, async 
   return c.json({ message: 'Mídia institucional atualizada.' });
 });
 
-institutionRoutes.delete('/:id/media/:mediaId', requireAuth, requireAdmin, async (c) => {
+institutionRoutes.delete('/:id/media/:mediaId', requireAuth, requireInstitutionAdmin, async (c) => {
   const media = await prisma.institutionMedia.deleteMany({ where: { id: c.req.param('mediaId'), institutionId: c.req.param('id') } });
   if (media.count === 0) return c.json({ error: 'Not Found', message: 'Mídia não encontrada.' }, 404);
   return c.body(null, 204);
+});
+
+institutionRoutes.post('/:id/media/upload', requireAuth, requireInstitutionAdmin, enforceRateLimit({ scope: 'institution-media-upload', limit: 30, windowMs: 60 * 60_000 }), enforceContentLength(3 * 1024 * 1024), async (c) => {
+  const body = await c.req.parseBody();
+  const file = body.file as unknown as UploadableMedia | undefined;
+  if (!file || typeof file.arrayBuffer !== 'function' || !['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 2 * 1024 * 1024) {
+    return c.json({ error: 'Bad Request', message: 'Envie uma imagem JPEG, PNG ou WEBP de até 2 MB.' }, 400);
+  }
+  await assertImageSignature(file);
+  const extension = file.type === 'image/jpeg' ? 'jpg' : file.type === 'image/png' ? 'png' : 'webp';
+  const stored = await uploadMedia(`institutions/${c.req.param('id')}/${randomUUID()}.${extension}`, file, resolveStorageProvider('THUMBNAIL'));
+  const media = await prisma.institutionMedia.create({ data: { institutionId: c.req.param('id')!, type: 'IMAGE', url: stored.url } });
+  return c.json({ data: media }, 201);
 });
 
 institutionRoutes.get('/:id/members', requireAuth, requireAdmin, async (c) => {
