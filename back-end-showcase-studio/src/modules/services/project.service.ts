@@ -117,9 +117,9 @@ export class ProjectService {
     });
   }
 
-  async getPublicStats() {
+  async getPublicStats(institutionSlug?: string) {
     const projects = await prisma.project.findMany({
-      where: { status: ProjectStatus.APPROVED },
+      where: { status: ProjectStatus.APPROVED, ...(institutionSlug ? { course: { institution: { slug: institutionSlug, active: true } } } : {}) },
       select: {
         courseId: true,
         viewsCount: true,

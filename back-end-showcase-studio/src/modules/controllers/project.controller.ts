@@ -52,7 +52,8 @@ export class ProjectController {
   }
 
   async getPublicStats(c: Context) {
-    return c.json({ data: await projectService.getPublicStats() }, 200);
+    const institutionSlug = c.req.query('institutionSlug');
+    return c.json({ data: await projectService.getPublicStats(institutionSlug), institutionSlug: institutionSlug ?? null }, 200);
   }
 
   async incrementViews(c: Context) {
