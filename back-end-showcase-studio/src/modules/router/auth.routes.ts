@@ -25,7 +25,7 @@ authRoutes.post('/login', enforceRateLimit({ scope: 'login-ip', limit: 20, windo
     return c.json({ error: 'Too Many Requests', message: 'Muitas tentativas de acesso. Tente novamente mais tarde.' }, 429);
   }
   const user = await prisma.user.findUnique({ where: { email } });
-  if (!user || !(await bcrypt.compare(password, user.password))) {
+  if (!user?.password || !(await bcrypt.compare(password, user.password))) {
     return c.json({ error: 'Unauthorized', message: 'Invalid email or password.' }, 401);
   }
   const safeUser = { id: user.id, name: user.name, email: user.email, role: user.role, courseId: user.courseId };

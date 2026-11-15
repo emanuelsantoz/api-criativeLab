@@ -13,6 +13,7 @@ import { semesterRoutes } from './modules/router/semester.routes';
 import { userRoutes } from './modules/router/users.routes';
 import { dashboardRoutes } from './modules/router/dashboard.routes';
 import { institutionRoutes } from './modules/router/institutions.routes';
+import { communityRoutes } from './modules/router/community.routes';
 import { env } from './config/env';
 import { NoOpenSemesterError, SemesterCourseConfigurationError, SemesterDeletionError } from './modules/services/semester.service';
 import { MediaStorageError } from './modules/storage/media.storage';
@@ -95,5 +96,6 @@ app.route('/semesters', semesterRoutes);
 app.route('/users', userRoutes);
 app.route('/dashboard', dashboardRoutes);
 app.route('/institutions', institutionRoutes);
+app.route('/community', communityRoutes);
 
 export default app;

@@ -39,7 +39,10 @@ export class ReviewService {
   async approve(projectId: string, reviewerId: string) {
     await prisma.projectAccessToken.updateMany({ where: { projectId, usedAt: null }, data: { usedAt: new Date() } });
     return prisma.$transaction(async (tx) => {
-      const project = await tx.project.update({ where: { id: projectId }, data: { status: ProjectStatus.APPROVED } });
+      const project = await tx.project.update({
+        where: { id: projectId },
+        data: { status: ProjectStatus.APPROVED, publishedAt: new Date() },
+      });
       await tx.projectReview.create({ data: { projectId, reviewerId, decision: ReviewDecision.APPROVED } });
       return project;
     });
