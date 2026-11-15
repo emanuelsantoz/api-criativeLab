@@ -53,6 +53,11 @@ enum InstitutionRole {
   PROFESSOR
 }
 
+enum InstitutionMediaType {
+  IMAGE
+  VIDEO
+}
+
 enum SubmissionContextStatus {
   DRAFT
   OPEN
@@ -176,10 +181,12 @@ model Institution {
   name              String
   slug              String                  @unique
   institutionTypeId String
+  description       String?                 @db.Text
   logoUrl           String?
   websiteUrl        String?
   active            Boolean                 @default(true)
   institutionType   InstitutionType         @relation(fields: [institutionTypeId], references: [id], onDelete: Restrict)
+  media             InstitutionMedia[]
   memberships       InstitutionMembership[]
   courses           Course[]
   disciplines       Discipline[]
@@ -190,6 +197,21 @@ model Institution {
 
   @@index([institutionTypeId])
   @@index([active])
+}
+
+model InstitutionMedia {
+  id            String               @id @default(uuid())
+  institutionId String
+  type          InstitutionMediaType
+  url           String
+  altText       String?
+  caption       String?
+  sortOrder     Int                  @default(0)
+  institution   Institution          @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  @@index([institutionId, sortOrder])
 }
 
 model InstitutionMembership {

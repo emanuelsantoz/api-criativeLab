@@ -36,6 +36,7 @@ export const updateProjectStatusSchema = z.object({
 
 export const queryProjectSchema = z.object({
   courseId: z.string().uuid().optional(),
+  institutionSlug: z.string().trim().toLowerCase().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).min(2).max(100).optional(),
   // IDs históricos da migration podem ser hashes estáveis; novos semestres usam UUID.
   semesterId: z.string().min(1).optional(),
   isFeatured: z.enum(['true', 'false']).optional().transform((value) => value === undefined ? undefined : value === 'true'),
