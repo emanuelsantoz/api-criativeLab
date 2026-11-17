@@ -1,5 +1,10 @@
 {
   "version": 2,
+  "git": {
+    "deploymentEnabled": {
+      "feature/comunidade-v1.6": false
+    }
+  },
   "installCommand": "npm ci --include=dev",
   "buildCommand": "npm run vercel-build"
 }
