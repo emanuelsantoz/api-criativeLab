@@ -12,6 +12,14 @@ enum Role {
   STUDENT
   ADMIN
   COORDENADOR
+  COMMUNITY_MEMBER
+}
+
+// A origem define a jornada e a curadoria do projeto, sem alterar a origem
+// institucional já existente.
+enum ProjectOrigin {
+  INSTITUTIONAL
+  COMMUNITY
 }
 
 enum ProjectStatus {
@@ -123,31 +131,48 @@ enum PlatformFeedbackTopic {
 }
 
 model User {
-  id              String          @id @default(uuid())
-  name            String
-  email           String          @unique
-  password        String
-  role            Role            @default(STUDENT)
-  phone           String?
-  jobTitle        String?
-  department      String?
-  location        String?
-  bio             String?         @db.Text
-  avatarUrl       String?
-  notifySubmissions Boolean       @default(true)
-  notifyWeeklySummary Boolean     @default(true)
-  notifySearchTrends Boolean      @default(false)
-  courseId        String?
-  course          Course?         @relation(fields: [courseId], references: [id])
+  id                     String                  @id @default(uuid())
+  name                   String                  @default("Membro da comunidade")
+  email                  String                  @unique
+  // Senha continua obrigatória para contas administrativas existentes. Contas
+  // da comunidade entram por link temporário enviado por e-mail.
+  password               String?
+  role                   Role                    @default(STUDENT)
+  phone                  String?
+  jobTitle               String?
+  department             String?
+  location               String?
+  bio                    String?                 @db.Text
+  avatarUrl              String?
+  communityEnabled       Boolean                 @default(false)
+  notifySubmissions      Boolean                 @default(true)
+  notifyWeeklySummary    Boolean                 @default(true)
+  notifySearchTrends     Boolean                 @default(false)
+  courseId               String?
+  course                 Course?                 @relation(fields: [courseId], references: [id])
   institutionMemberships InstitutionMembership[]
-  projects        ProjectMember[]
-  likes           Like[]
-  createdProjects Project[]       @relation("ProjectCreator")
-  reviews         ProjectReview[]
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  projects               ProjectMember[]
+  likes                  Like[]
+  createdProjects        Project[]               @relation("ProjectCreator")
+  reviews                ProjectReview[]
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
 
   @@index([email])
+}
+
+// Tokens de acesso sem senha para a comunidade. O segredo nunca é persistido:
+// apenas seu hash, com expiração curta e uso único.
+model CommunityAccessToken {
+  id        String    @id @default(uuid())
+  email     String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([email, expiresAt])
+  @@index([expiresAt])
 }
 
 model Course {
@@ -161,7 +186,7 @@ model Course {
   semesterCourses SemesterCourse[]
 
   submissionContexts SubmissionContext[]
-  courseDisciplines CourseDiscipline[]
+  courseDisciplines  CourseDiscipline[]
 
   @@unique([institutionId, name])
   @@index([institutionId])
@@ -192,8 +217,8 @@ model Institution {
   disciplines       Discipline[]
   academicPeriods   AcademicPeriod[]
   submissionContexts SubmissionContext[]
-  createdAt         DateTime                @default(now())
-  updatedAt         DateTime                @updatedAt
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
 
   @@index([institutionTypeId])
   @@index([active])
@@ -218,43 +243,43 @@ model InstitutionMembership {
   institutionId String
   userId        String
   role          InstitutionRole
-  active        Boolean     @default(true)
-  institution   Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
-  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  active        Boolean         @default(true)
+  institution   Institution     @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
 
   @@id([institutionId, userId])
   @@index([userId, active])
 }
 
 model AcademicPeriod {
-  id            String        @id @default(uuid())
-  institutionId String
-  code          String
-  label         String
-  startsAt      DateTime?
-  endsAt        DateTime?
-  institution   Institution   @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  id                 String              @id @default(uuid())
+  institutionId      String
+  code               String
+  label              String
+  startsAt           DateTime?
+  endsAt             DateTime?
+  institution        Institution         @relation(fields: [institutionId], references: [id], onDelete: Cascade)
   submissionContexts SubmissionContext[]
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
 
   @@unique([institutionId, code])
   @@index([institutionId])
 }
 
 model Discipline {
-  id            String        @id @default(uuid())
-  institutionId String
-  name          String
-  code          String?
-  description   String?
-  institution   Institution   @relation(fields: [institutionId], references: [id], onDelete: Cascade)
-  courseDisciplines CourseDiscipline[]
+  id                 String              @id @default(uuid())
+  institutionId      String
+  name               String
+  code               String?
+  description        String?
+  institution        Institution         @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  courseDisciplines  CourseDiscipline[]
   submissionContexts SubmissionContext[]
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
 
   @@unique([institutionId, name])
   @@unique([institutionId, code])
@@ -312,12 +337,12 @@ model SubmissionContextTag {
 }
 
 model Tag {
-  id              String             @id @default(uuid())
-  name            String             @unique
-  semesterCourses SemesterCourseTag[]
+  id                 String                 @id @default(uuid())
+  name               String                 @unique
+  semesterCourses    SemesterCourseTag[]
   submissionContexts SubmissionContextTag[]
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
 }
 
 model Project {
@@ -334,7 +359,11 @@ model Project {
   thumbnailUrl             String?
   thumbnailStorageProvider StorageProvider?
   thumbnailStorageKey      String?
+  origin                   ProjectOrigin        @default(INSTITUTIONAL)
   status                   ProjectStatus        @default(PENDING_REVIEW)
+  // Preenchido quando a curadoria aprova o projeto. Permite feeds confiáveis
+  // de publicações, sem confundir a data do envio com a data de publicação.
+  publishedAt              DateTime?
   isFeatured               Boolean              @default(false)
   viewsCount               Int                  @default(0)
   likesCount               Int                  @default(0)
@@ -342,11 +371,13 @@ model Project {
   liveUrl                  String?
   prototypeUrl             String?
   repositoryUrl            String?
-  courseId                 String
+  // Projetos institucionais continuam preenchendo curso e semestre. Para a
+  // comunidade esses vínculos são nulos por definição.
+  courseId                 String?
   className                String               @default("Turma única")
-  course                   Course               @relation(fields: [courseId], references: [id])
-  semesterId               String
-  semester                 Semester             @relation(fields: [semesterId], references: [id])
+  course                   Course?              @relation(fields: [courseId], references: [id])
+  semesterId               String?
+  semester                 Semester?            @relation(fields: [semesterId], references: [id])
   submissionContextId      String?
   submissionContext        SubmissionContext?   @relation(fields: [submissionContextId], references: [id], onDelete: SetNull)
   createdById              String?
@@ -368,6 +399,7 @@ model Project {
   @@index([semesterId, className, status])
   @@index([createdById])
   @@index([submissionContextId])
+  @@index([origin, status, publishedAt])
 }
 
 model Semester {
@@ -391,10 +423,10 @@ model Semester {
 model SemesterCourse {
   semesterId String
   courseId   String
-  className  String   @default("Turma única")
+  className  String              @default("Turma única")
   theme      String?
-  semester   Semester @relation(fields: [semesterId], references: [id], onDelete: Cascade)
-  course     Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  semester   Semester            @relation(fields: [semesterId], references: [id], onDelete: Cascade)
+  course     Course              @relation(fields: [courseId], references: [id], onDelete: Cascade)
   tags       SemesterCourseTag[]
 
   @@id([semesterId, courseId, className])
@@ -402,12 +434,12 @@ model SemesterCourse {
 }
 
 model SemesterCourseTag {
-  semesterId String
-  courseId   String
-  className  String
-  tagId      String
+  semesterId     String
+  courseId       String
+  className      String
+  tagId          String
   semesterCourse SemesterCourse @relation(fields: [semesterId, courseId, className], references: [semesterId, courseId, className], onDelete: Cascade)
-  tag        Tag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  tag            Tag            @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@id([semesterId, courseId, className, tagId])
   @@index([tagId])
@@ -440,17 +472,17 @@ model ProjectAccessToken {
 }
 
 model SubmissionFeedback {
-  id                     String                           @id @default(uuid())
-  projectId              String                           @unique
+  id                      String                          @id @default(uuid())
+  projectId               String                          @unique
   requiredInformationEase SubmissionFeedbackEase
-  overallExperience      SubmissionFeedbackExperience
-  hardestStep            SubmissionFeedbackHardestStep
-  hardestStepOther       String?                          @db.VarChar(160)
-  understoodNextSteps    SubmissionFeedbackUnderstanding
-  reuseIntent            SubmissionFeedbackReuseIntent
-  improvementSuggestion  String?                          @db.Text
-  createdAt              DateTime                         @default(now())
-  project                Project                          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  overallExperience       SubmissionFeedbackExperience
+  hardestStep             SubmissionFeedbackHardestStep
+  hardestStepOther        String?                         @db.VarChar(160)
+  understoodNextSteps     SubmissionFeedbackUnderstanding
+  reuseIntent             SubmissionFeedbackReuseIntent
+  improvementSuggestion   String?                         @db.Text
+  createdAt               DateTime                        @default(now())
+  project                 Project                         @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([createdAt])
 }
@@ -497,14 +529,14 @@ model ProjectMember {
 }
 
 model ProjectContributor {
-  id        String   @id @default(uuid())
-  projectId String
-  name      String
-  email     String?
-  roleInfo  String?
-  avatarUrl String?
+  id          String  @id @default(uuid())
+  projectId   String
+  name        String
+  email       String?
+  roleInfo    String?
+  avatarUrl   String?
   avatarColor String?
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
 }

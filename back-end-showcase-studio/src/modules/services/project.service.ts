@@ -141,7 +141,7 @@ export class ProjectService {
     return {
       publishedProjects: projects.length,
       participatingStudents: students.size,
-      courses: new Set(projects.map((project) => project.courseId)).size,
+      courses: new Set(projects.map((project) => project.courseId).filter(Boolean)).size,
       totalViews: projects.reduce((total, project) => total + project.viewsCount, 0),
       totalLikes: projects.reduce((total, project) => total + project.likesCount, 0),
     };
@@ -230,7 +230,15 @@ export class ProjectService {
   }
 
   async updateStatus(id: string, status: ProjectStatus, isFeatured?: boolean) {
-    return prisma.project.update({ where: { id }, data: { status, ...(isFeatured !== undefined && { isFeatured }) }, include: details });
+    return prisma.project.update({
+      where: { id },
+      data: {
+        status,
+        ...(status === ProjectStatus.APPROVED ? { publishedAt: new Date() } : {}),
+        ...(isFeatured !== undefined && { isFeatured }),
+      },
+      include: details,
+    });
   }
 
   async delete(id: string) {
@@ -305,6 +313,11 @@ export class ProjectService {
     // Edições de texto/link não devem falhar por uma configuração histórica
     // de semestre. A vinculação só é validada quando o administrador a altera.
     if (associationChanged) {
+      if (!nextCourseId || !nextSemesterId) {
+        throw new SemesterCourseConfigurationError(
+          'Projetos institucionais precisam de disciplina, turma e semestre.',
+        );
+      }
       const offering = await prisma.semesterCourse.findUnique({
         where: { semesterId_courseId_className: { semesterId: nextSemesterId, courseId: nextCourseId, className: nextClassName } },
       });
